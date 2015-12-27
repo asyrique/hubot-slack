@@ -305,7 +305,20 @@ class SlackBot extends Adapter
     msg.attachments = data.attachments || data.content
     msg.attachments = [msg.attachments] unless Array.isArray msg.attachments
 
-    msg.text = data.text
+    msg.text = data.text.replace /(?:^| )(@([\S]+))/gm, (match, p1, p2) =>
+      # Greedily match the username, pruning off trailing non-word characters until we get a full match
+      trimmedArgument = p2
+      user = @client.getUserByName trimmedArgument
+      while not user and trimmedArgument.length > 1 and trimmedArgument[trimmedArgument.length - 1].match /\W/
+        trimmedArgument = trimmedArgument.slice 0, trimmedArgument.length - 1
+        user = @client.getUserByName trimmedArgument
+
+      if user
+        match = match.replace "@#{trimmedArgument}", "<@#{user.id}>"
+      else if trimmedArgument in SlackBot.RESERVED_KEYWORDS
+        match = match.replace "@#{trimmedArgument}", "<!#{trimmedArgument}>"
+      else
+        match = match
 
     if data.username && data.username != @robot.name
       msg.as_user = false
